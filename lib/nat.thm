@@ -1,0 +1,18 @@
+
+one = S Z;
+pred n = natCase n (\_. Z) (\p. p);
+
+add = fix (\f m n.
+        natCase m (\_. n) (\p. S (f p n)));
+
+mult = fix (\f m n.
+         natCase m (\_. Z) (\p. add n (f p n)));
+
+sub = fix (\f m n.
+        natCase m (\_. Z) (\p. f p (pred n)));
+
+div = fix (\f m n.
+        let r = sub m n; in
+          natCase r (\_. Z) (\_. S (f r n)));
+
+fact = fix (\f n. natCase (\_. S Z) (\p. mult n (f p)));
