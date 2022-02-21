@@ -72,8 +72,8 @@ checkExpr (Var name) bs =
 checkExpr Fix _ =
   do t1 <- newtyvar
      t2 <- newtyvar
-     subsReturn (S.fromList [t1, t2],
-             FunType (FunType (TVar t1) (TVar t2)) (FunType (TVar t1) (TVar t2)))
+     let ft = (FunType (TVar t1) (TVar t2))
+     subsReturn (S.fromList [t1, t2], FunType (FunType ft ft) ft)
 checkExpr Unit _ = subsReturn (S.empty, UnitType)
 checkExpr Z _ = subsReturn (S.empty, NatType)
 checkExpr S _ = subsReturn (S.empty, FunType NatType NatType)
