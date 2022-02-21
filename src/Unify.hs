@@ -2,37 +2,52 @@
 -- Unification based on Alberto Martelli and Ugo Montanari's paper
 -- "An Efficient Unification Algorithm", specifically algorithm 1.
 
-module Unify where
+module Unify (Unification,
+              fromList, prependEq, union,
+              getVar, subst
+             )
+where
 
 import CST
 
-import qualified Data.Map as Map
 
+type Unification = [(Type, Type)]
 
-type Substitution = Map.Map String Type
-type Equations = [(Type, Type)]
-
-data Result = Success Equations
+data Result = Success Unification
             | NoAction
             | Failure
-type UnifRule = (Type, Type) -> Equations -> Result
+type UnifRule = (Type, Type) -> Unification -> Result
 
 
-mgu :: Equations -> Maybe Substitution
-mgu eqs =
+fromList :: Unification -> Maybe Unification
+fromList eqs =
     case tryRules rules eqs of
-        Success eqs' -> mgu eqs'
-        NoAction -> toSubstition eqs
+        Success eqs' -> fromList eqs'
+        NoAction -> Just eqs
         Failure -> Nothing
 
-toSubstition :: Equations -> Maybe Substitution
-toSubstition = (fmap Map.fromList) . sequence . (fmap eqToSubs)
-  where
-    eqToSubs (TVar name, t) = Just (name, t)
-    eqToSubs _ = Nothing
+prependEq :: (Type, Type) -> Unification -> Maybe Unification
+prependEq eq eqs = fromList $ eq:eqs
+
+union :: Unification -> Unification -> Maybe Unification
+union eqs1 eqs2 = fromList $ eqs1 ++ eqs2
+
+getVar :: String -> Unification -> Maybe Type
+getVar _ [] = Nothing
+getVar name ((TVar name', t):eqs) =
+  if name == name' then Just t else getVar name eqs
+
+subst :: Unification -> Type -> Type
+subst u (FunType t1 t2) = FunType (subst u t1) (subst u t2)
+subst u (TVar name) =
+  case getVar name u of
+    Just t -> t
+    Nothing -> TVar name
+subst _ UnitType = UnitType
+subst _ NatType = NatType
 
 
-tryRules :: [UnifRule] -> Equations -> Result
+tryRules :: [UnifRule] -> Unification -> Result
 tryRules [] _ = NoAction
 tryRules (r:rs) eqs =
   case tryRule r eqs of
@@ -40,10 +55,10 @@ tryRules (r:rs) eqs =
     NoAction -> tryRules rs eqs
     Failure -> Failure
 
-tryRule :: UnifRule -> Equations -> Result
+tryRule :: UnifRule -> Unification -> Result
 tryRule f eqs = tryRuleSub f [] eqs
 
-tryRuleSub :: UnifRule -> Equations -> Equations -> Result
+tryRuleSub :: UnifRule -> Unification -> Unification -> Result
 tryRuleSub _ _ [] = NoAction
 tryRuleSub f beqs (eq:feqs) =
   case f eq (beqs ++ feqs) of
@@ -59,7 +74,7 @@ occursType name (TVar name') = name == name'
 occursType _ UnitType = False
 occursType _ NatType = False
 
-occursUnif :: String -> Equations -> Bool
+occursUnif :: String -> Unification -> Bool
 occursUnif _ [] = False
 occursUnif name ((t1, t2):eqs) =
   occursType name t1 || occursType name t2 || occursUnif name eqs
@@ -71,7 +86,7 @@ subsType name t (FunType t1 t2) =
   FunType (subsType name t t1) (subsType name t t2)
 subsType _ _ t = t
 
-subsUnif :: String -> Type -> Equations -> Equations
+subsUnif :: String -> Type -> Unification -> Unification
 subsUnif name t =
   fmap (\(t1, t2) -> (subsType name t t1, subsType name t t2))
 
@@ -86,12 +101,11 @@ flipRule (t, tv@(TVar _)) eqs = Success ((tv, t):eqs)
 flipRule _ _ = NoAction
 
 reflRule :: UnifRule
-reflRule (TVar name1, TVar name2) eqs =
-  if name1 == name2 then
+reflRule (t1, t2) eqs =
+  if t1 == t2 then
     Success eqs
   else
     NoAction
-reflRule _ _ = NoAction
 
 consRule :: UnifRule
 consRule (FunType t1 t2, FunType t3 t4) eqs =

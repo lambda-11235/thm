@@ -6,17 +6,17 @@ import qualified AST
 
 data Statement = ExprS Expr
                | FuncDefS FuncDef
-  deriving(Show)
+  deriving(Eq, Show)
 
 
 data Type = FunType Type Type
           | TVar String
           | UnitType
           | NatType
-  deriving(Show)
+  deriving(Eq, Show)
 
 data FuncDef = FuncDef String Expr
-  deriving(Show)
+  deriving(Eq, Show)
 
 data Expr = Let FuncDef Expr
           | Lambda (Maybe String) Expr
@@ -27,7 +27,7 @@ data Expr = Let FuncDef Expr
           | Z
           | S
           | NatCase
-  deriving(Show)
+  deriving(Eq, Show)
 
 
 statementFromAST :: AST.Statement -> Statement
@@ -56,6 +56,16 @@ exprFromAST AST.NatCase = NatCase
 lambdify [] expr = exprFromAST expr
 lambdify (v:vs) expr = Lambda v (lambdify vs expr)
 
+
+ppType :: Type -> String
+ppType (FunType t1 t2) = ppFTLeft t1 ++ " -> " ++ ppType t2
+ppType (TVar name) = "'" ++ name
+ppType UnitType = "Unit"
+ppType NatType = "N"
+
+ppFTLeft :: Type -> String
+ppFTLeft e@(FunType _ _) = "(" ++ ppType e ++ ")"
+ppFTLeft e = ppType e
 
 
 ppStatement :: Statement -> String
