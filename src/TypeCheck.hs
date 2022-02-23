@@ -1,4 +1,8 @@
 
+module TypeCheck (Context (..), runContext,
+                  UnInstTVars (..), Bindings (..),
+                  checkExpr) where
+
 import Data.Char (chr, ord)
 import Control.Monad.State (StateT, get, put, lift,
                             runStateT, evalStateT, execStateT)
@@ -15,6 +19,9 @@ type Context a = StateT (Int, Unification) (Either String) a
 
 failure :: String -> Context a
 failure s = lift (Left s)
+
+runContext :: Context a -> Either String a
+runContext c = evalStateT c (0, [])
 
 
 tyvarFromInt :: Int -> String

@@ -15,4 +15,7 @@ div = fix (\f m n.
         let r = sub m n; in
           natCase r (\_. Z) (\_. S (f r n)));
 
-fact = fix (\f n. natCase (\_. S Z) (\p. mult n (f p)));
+fact = fix (\f n. natCase n (\_. S Z) (\p. mult n (f p)));
+
+
+repeatedly = fix (\r n f x. natCase n (\_. x) (\p. f (r p f x)));
