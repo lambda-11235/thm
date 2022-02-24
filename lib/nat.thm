@@ -1,38 +1,28 @@
 
 pred n = natCase n (\_. 0) (\p. p);
 
-equal = fix (\equal m n t f.
+fix equal m n t f =
   natCase m (\_. natCase n (\_. t unit) (\_. f unit))
-            (\pm. natCase n (\_. f unit) (\pn. equal pm pn t f)));
+            (\pm. natCase n (\_. f unit) (\pn. equal pm pn t f));
 
-lt = fix (\lt m n t f.
+fix lt m n t f =
   natCase m (\_. natCase n (\_. f unit) (\_. t unit))
-            (\pm. natCase n (\_. f unit) (\pn. lt pm pn t f)));
+            (\pm. natCase n (\_. f unit) (\pn. lt pm pn t f));
 
 
-add = fix (\add m n.
-        natCase m (\_. n) (\p. S (add p n)));
+fix add m n = natCase m (\_. n) (\p. S (add p n));
 
-mult = fix (\mult m n.
-         natCase m (\_. 0) (\p. add n (mult p n)));
+fix mult m n = natCase m (\_. 0) (\p. add n (mult p n));
 
-pow = fix (\pow m n.
-         natCase n (\_. 1) (\p. mult m (pow m p)));
+fix pow m n = natCase n (\_. 1) (\p. mult m (pow m p));
 
-sub = fix (\sub m n.
-        natCase n (\_. m) (\p. sub (pred m) p));
+fix sub m n = natCase n (\_. m) (\p. sub (pred m) p);
 
-div = fix (\div m n.
-  lt m n (\_. 0)
-         (\_. S (div (sub m n) n)));
+fix div m n = lt m n (\_. 0) (\_. S (div (sub m n) n));
 
-rem = fix (\rem m n.
-  lt m n (\_. m)
-         (\_. rem (sub m n) n));
+fix rem m n = lt m n (\_. m) (\_. rem (sub m n) n);
 
 
-fact = fix (\fact n.
-  natCase n (\_. S 0) (\p. mult n (fact p)));
+fix fact n = natCase n (\_. S 0) (\p. mult n (fact p));
 
-repeatedly = fix (\repeatedly n f x.
-  natCase n (\_. x) (\p. f (repeatedly p f x)));
+fix repeatedly n f x = natCase n (\_. x) (\p. f (repeatedly p f x));

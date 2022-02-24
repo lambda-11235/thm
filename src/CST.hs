@@ -36,8 +36,10 @@ statementFromAST (AST.FuncDefS fdef) = FuncDefS (fdefFromAST fdef)
 
 
 fdefFromAST :: AST.FuncDef -> FuncDef
-fdefFromAST (AST.FuncDef name [] expr) = FuncDef name (exprFromAST expr)
-fdefFromAST (AST.FuncDef name vars expr) = FuncDef name (lambdify vars expr)
+fdefFromAST (AST.FuncDef False name vars expr) =
+  FuncDef name (lambdify vars expr)
+fdefFromAST (AST.FuncDef True name vars expr) =
+  FuncDef name (App Fix (Lambda (Just name) (lambdify vars expr)))
 
 exprFromAST :: AST.Expr -> Expr
 exprFromAST (AST.Let [] e) = exprFromAST e

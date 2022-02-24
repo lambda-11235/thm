@@ -4,7 +4,8 @@ module AST where
 data Statement = ExprS Expr
                | FuncDefS FuncDef
 
-data FuncDef = FuncDef String [Maybe String] Expr
+-- Bool indicates if function is fixed
+data FuncDef = FuncDef Bool String [Maybe String] Expr
   deriving(Show)
 
 data Expr = Let [FuncDef] Expr

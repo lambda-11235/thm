@@ -76,10 +76,10 @@ ppData (DNatCase Nothing (Just x)) = "natCase <error> " ++ ppParen x
 ppData (DNatCase (Just n) Nothing) = "natCase " ++ show n
 ppData (DNatCase (Just n) (Just x)) = "natCase " ++ show n ++ " " ++ ppParen x
 ppData (DFunction _ Nothing body) = "\\_. " ++ ppExpr body
-ppData (DFunction _ (Just name) body) = "let <context> in \\" ++ name ++ ". " ++ ppExpr body
+ppData (DFunction _ (Just name) body) = "<function>" --"let <context> in \\" ++ name ++ ". " ++ ppExpr body
 
 ppParen :: Data -> String
 ppParen x@(DFix _) = "(" ++ ppData x ++ ")"
 ppParen x@(DNatCase _ _) = "(" ++ ppData x ++ ")"
-ppParen x@(DFunction _ _ _) = "(" ++ ppData x ++ ")"
+--ppParen x@(DFunction _ _ _) = "(" ++ ppData x ++ ")"
 ppParen x = ppData x

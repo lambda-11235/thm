@@ -61,12 +61,13 @@ pfile = many funcdef <* eof
 
 
 funcdef :: Parser FuncDef
-funcdef = do name <- sym
+funcdef = do fixed <- option False (match LFix *> return True)
+             name <- sym
              vars <- many arg
              match LEqual
              e <- expr
              match LSemiColon
-             return (FuncDef name vars e)
+             return (FuncDef fixed name vars e)
 
 
 expr :: Parser Expr
