@@ -1,6 +1,6 @@
 
 module TypeCheck (Context (..), runContext,
-                  UnInstTVars (..), Bindings (..),
+                  UnInstTVars (..), Bindings (..), insert,
                   checkExpr) where
 
 import Data.Char (chr, ord)
@@ -48,6 +48,17 @@ unify errMsg t1 t2 =
 type UnInstTVars = S.Set String
 type Bindings = M.Map String (UnInstTVars, Type)
 
+tvarsIn :: Type -> UnInstTVars
+tvarsIn (FunType t1 t2) = S.union (tvarsIn t1) (tvarsIn t2)
+tvarsIn (TVar name) = S.singleton name
+tvarsIn UnitType = S.empty
+tvarsIn NatType = S.empty
+
+insert :: String -> UnInstTVars -> Type -> Bindings -> Bindings
+insert name uitvs t bs = 
+  let uitvs' = S.intersection uitvs (tvarsIn t) in
+    M.insert name (uitvs', t) bs
+
 subsReturn :: (UnInstTVars, Type) -> Context (UnInstTVars, Type)
 subsReturn (uitvs, t) =
   do (_, u) <- get
@@ -57,11 +68,11 @@ subsReturn (uitvs, t) =
 checkExpr :: Expr -> Bindings -> Context (UnInstTVars, Type)
 checkExpr (Let (FuncDef name body) e) bs =
   do (uitvs, t) <- checkExpr body bs
-     checkExpr e (M.insert name (uitvs, t) bs)
+     checkExpr e (insert name uitvs t bs)
 checkExpr (Lambda mname body) bs =
   do t <- newtyvar
      let bs' = case mname of
-                 Just name -> M.insert name (S.empty, TVar t) bs
+                 Just name -> insert name S.empty (TVar t) bs
                  Nothing -> bs
      (uitvs, tb) <- checkExpr body bs'
      subsReturn (S.insert t uitvs, FunType (TVar t) tb)
@@ -75,14 +86,14 @@ checkExpr (App e1 e2) bs =
 checkExpr (Var name) bs =
   case M.lookup name bs of
     Just (qtvs, t) -> instQTypes qtvs t
-    Nothing -> failure "var"
+    Nothing -> failure ("Variable not bound " ++ name)
 checkExpr Fix _ =
   do t1 <- newtyvar
      t2 <- newtyvar
      let ft = (FunType (TVar t1) (TVar t2))
      subsReturn (S.fromList [t1, t2], FunType (FunType ft ft) ft)
 checkExpr Unit _ = subsReturn (S.empty, UnitType)
-checkExpr Z _ = subsReturn (S.empty, NatType)
+checkExpr (Num _) _ = subsReturn (S.empty, NatType)
 checkExpr S _ = subsReturn (S.empty, FunType NatType NatType)
 checkExpr NatCase _ =
   do t <- newtyvar

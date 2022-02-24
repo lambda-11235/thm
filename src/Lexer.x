@@ -4,7 +4,8 @@ module Lexer (Token (..), LexOut (..), scan) where
 
 %wrapper "posn"
 
-@char = [a-zA-Z0-9]
+@str = [a-zA-Z][a-zA-Z0-9]*
+@num = [0-9]+
 
 tokens :-
 
@@ -23,13 +24,13 @@ tokens :-
   "in"                                  { \p s -> lexOut p LIn }
   "fix"                                 { \p s -> lexOut p LFix }
   "unit"                                { \p s -> lexOut p LUnit }
-  "Z"                                   { \p s -> lexOut p LZero }
   "S"                                   { \p s -> lexOut p LSucc }
   "natCase"                             { \p s -> lexOut p LNatCase }
 
   "_"                                   { \p s -> lexOut p LUnderscore }
 
-  @char+                                { \p s -> lexOut p (LSym s) }
+  @str                                  { \p s -> lexOut p (LSym s) }
+  @num                                  { \p s -> lexOut p (LNum $ read s) }
 
 {
 data Token = LLParen
@@ -43,10 +44,10 @@ data Token = LLParen
            | LIn
            | LFix
            | LUnit
-           | LZero
            | LSucc
            | LNatCase
            | LSym String
+           | LNum Int
            deriving (Eq, Show)
 
 data LexOut = LexOut { offset :: Int

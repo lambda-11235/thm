@@ -13,7 +13,7 @@ data Expr = Let [FuncDef] Expr
           | Var String
           | Fix
           | Unit
-          | Z
+          | Num Int
           | S
           | NatCase
   deriving(Show)

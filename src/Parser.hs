@@ -40,6 +40,12 @@ sym = tokenPrim (show . getToken) pos (match' . getToken)
     match' (LSym name) = Just name
     match' _ = Nothing
 
+num :: Parser Int
+num = tokenPrim (show . getToken) pos (match' . getToken)
+  where
+    match' (LNum x) = Just x
+    match' _ = Nothing
+
 pos :: (SourcePos -> LexOut -> [LexOut] -> SourcePos)
 pos oldPos (LexOut _ line col _) _ = newPos (sourceName oldPos) line col
 
@@ -47,14 +53,11 @@ pos oldPos (LexOut _ line col _) _ = newPos (sourceName oldPos) line col
 -- * Grammar
 
 -- | A top level entry in the REPL.
-topREPL :: Parser Statement
-topREPL = statement <* eof
+topREPL :: Parser Expr
+topREPL = expr <* eof
 
 pfile :: Parser [FuncDef]
 pfile = many funcdef <* eof
-
-statement :: Parser Statement
-statement = fmap ExprS expr <|> fmap FuncDefS funcdef
 
 
 funcdef :: Parser FuncDef
@@ -99,7 +102,7 @@ atom = (match LLParen *> expr <* match LRParen) <|> (fmap Var sym) <|> keyword
 keyword :: Parser Expr
 keyword = (    (match LFix *> return Fix)
            <|> (match LUnit *> return Unit)
-           <|> (match LZero *> return Z)
+           <|> (fmap Num num)
            <|> (match LSucc *> return S)
            <|> (match LNatCase *> return NatCase))
 

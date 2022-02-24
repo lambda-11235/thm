@@ -24,7 +24,7 @@ data Expr = Let FuncDef Expr
           | Var String
           | Fix
           | Unit
-          | Z
+          | Num Int
           | S
           | NatCase
   deriving(Eq, Show)
@@ -48,7 +48,7 @@ exprFromAST (AST.App e1 e2) = App (exprFromAST e1) (exprFromAST e2)
 exprFromAST (AST.Var name) = Var name
 exprFromAST AST.Fix = Fix
 exprFromAST AST.Unit = Unit
-exprFromAST AST.Z = Z
+exprFromAST (AST.Num x) = Num x
 exprFromAST AST.S = S
 exprFromAST AST.NatCase = NatCase
 
@@ -85,7 +85,7 @@ ppExpr (App e1 e2) = ppAppLeft e1 ++ " " ++ ppAppRight e2
 ppExpr (Var name) = name
 ppExpr Fix = "fix"
 ppExpr Unit = "unit"
-ppExpr Z = "Z"
+ppExpr (Num x) = show x
 ppExpr S = "S"
 ppExpr NatCase = "natCase"
 
