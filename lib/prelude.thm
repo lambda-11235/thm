@@ -1,6 +1,6 @@
 
 type Bottom []
-type Top [ top() ]
+type Top [ top ]
 
 type UnInhabited 'a [ un('a -> Bottom) ]
 
@@ -8,11 +8,12 @@ type Prod 'a 'b [ prod('a, 'b) ]
 type Sum 'a 'b [ sum1('a) sum2('b) ]
 
 
-type Bool [ true() false() ]
+type Bool [ true false ]
 
-not b = case[Bool] false true b;
-and b1 b2 = case[Bool] b2 false b1;
-or b1 b2 = case[Bool] true b2 b1;
+if b t f = case[Bool] t f b;
+not b = if b false true;
+and b1 b2 = if b1 b2 false;
+or b1 b2 = if b1 true b2;
 
 
 id x = x;

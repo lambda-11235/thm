@@ -1,5 +1,7 @@
 
-type Nat [ Z() S(Nat) ]
+type Nat [ Z S(Nat) ]
+
+fix natInd x f = case[Nat] x (\p. f (natInd x f p));
 
 n0 = Z;
 n1 = S n0;

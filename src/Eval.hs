@@ -15,7 +15,7 @@ import qualified TypeDef as TD
 
 type Bindings = M.Map String Data
 type Result a = Either String a
-          
+
 data Data = DFix (Maybe Data)
           | DCase String [Data]
           | DCons String [Data]

@@ -71,9 +71,9 @@ typeDef =
 consDef :: Parser ConsDef
 consDef =
   do cname <- sym
-     match LLParen
-     targs <- sepBy ptype (match LComma)
-     match LRParen
+     targs <- option [] (match LLParen *>
+                         sepBy ptype (match LComma)
+                         <* match LRParen)
      return (ConsDef cname targs)
 
 

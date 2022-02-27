@@ -1,6 +1,7 @@
 
-module TypeCheck (Context (..), runContext,
-                  UnInstTyVars (..), Bindings (..), insert,
+module TypeCheck (Env (..), runEnv,
+                  Bindings (..), Context (..),
+                  empty, insert, insertLet,
                   checkExpr) where
 
 import Data.Char (chr, ord)
@@ -17,27 +18,27 @@ import qualified TypeDef as TD
 
 
 
-type Context a = StateT (Int, Unification) (Either String) a
+type Env a = StateT (Int, Unification) (Either String) a
 
 
-failure :: String -> Context a
+failure :: String -> Env a
 failure s = lift (Left s)
 
-runContext :: Context a -> Either String a
-runContext c = evalStateT c (0, [])
+runEnv :: Env a -> Either String a
+runEnv c = evalStateT c (0, [])
 
 
 tyvarFromInt :: Int -> String
 tyvarFromInt n =
   if n < 26 then [chr $ n + ord 'a'] else "tv" ++ (show $ n - 26)
-  
-newtyvar :: Context String
+
+newtyvar :: Env String
 newtyvar =
   do (n, u) <- get
      put (n + 1, u)
      return (tyvarFromInt n)
 
-unify :: String -> Type -> Type -> Context ()
+unify :: String -> Type -> Type -> Env ()
 unify errMsg t1 t2 =
   do (n, u) <- get
      case prependEq (t1, t2) u of
@@ -47,45 +48,61 @@ unify errMsg t1 t2 =
 
 
 -- A binding maps a variable to pair.
--- The pair is (quantified variable, type)
-type UnInstTyVars = S.Set String
-type Bindings = M.Map String (UnInstTyVars, Type)
+-- The pair is (quantified variables, type)
+type Bindings = M.Map String (S.Set String, Type)
+-- Set of free variables and the variable bindings
+data Context = Context (S.Set String) Bindings
 
-tvarsIn :: Type -> UnInstTyVars
+tvarsIn :: Type -> S.Set String
 tvarsIn (FunType t1 t2) = S.union (tvarsIn t1) (tvarsIn t2)
 tvarsIn (TyVar name) = S.singleton name
 tvarsIn (TyCons _ ts) = S.unions (map tvarsIn ts)
 
-insert :: String -> UnInstTyVars -> Type -> Bindings -> Bindings
-insert name uitvs t bs = 
-  let uitvs' = S.intersection uitvs (tvarsIn t) in
-    M.insert name (uitvs', t) bs
+empty :: Context
+empty = Context S.empty M.empty
 
-subsReturn :: (UnInstTyVars, Type) -> Context (UnInstTyVars, Type)
-subsReturn (uitvs, t) =
+insert :: String -> Type -> Context -> Context
+insert name t (Context ftvs bs) =
+  let ftvs' = S.union (tvarsIn t) ftvs in
+    Context ftvs' (M.insert name (S.empty, t) bs)
+
+insertLet :: String -> Type -> Context -> Context
+insertLet name t (Context ftvs bs) =
+  let qtvs = S.difference (tvarsIn t) ftvs in
+    Context ftvs (M.insert name (qtvs, t) bs)
+
+reifyContext :: Context -> Env Context
+reifyContext (Context ftvs bs) =
   do (_, u) <- get
-     return (uitvs, subst u t)
+     let f t = tvarsIn (subst u t)
+     let ftvs' = S.unions (map (f . TyVar) (S.toList ftvs))
+     return (Context ftvs' bs)
+
+subsReturn :: Type -> Env Type
+subsReturn t =
+  do (_, u) <- get
+     return (subst u t)
 
 
-checkExpr :: Expr -> TD.Bindings -> Bindings -> Context (UnInstTyVars, Type)
-checkExpr (Let (FuncDef name body) e) tdbs bs =
-  do (uitvs, t) <- checkExpr body tdbs bs
-     checkExpr e tdbs (insert name uitvs t bs)
-checkExpr (Lambda mname body) tdbs bs =
+checkExpr :: Expr -> TD.Bindings -> Context -> Env Type
+checkExpr (Let (FuncDef name body) e) tdbs ctx =
+  do t <- checkExpr body tdbs ctx
+     ctx' <- reifyContext ctx
+     checkExpr e tdbs (insertLet name t ctx')
+checkExpr (Lambda mname body) tdbs ctx =
   do t <- newtyvar
-     let bs' = case mname of
-                 Just name -> insert name S.empty (TyVar t) bs
-                 Nothing -> bs
-     (uitvs, tb) <- checkExpr body tdbs bs'
-     subsReturn (S.insert t uitvs, FunType (TyVar t) tb)
-checkExpr (App e1 e2) tdbs bs =
-  do (ut1, t1) <- checkExpr e1 tdbs bs
-     (ut2, t2) <- checkExpr e2 tdbs bs
+     let ctx' = case mname of
+                  Just name -> insert name (TyVar t) ctx
+                  Nothing -> ctx
+     tb <- checkExpr body tdbs ctx'
+     subsReturn (FunType (TyVar t) tb)
+checkExpr (App e1 e2) tdbs ctx =
+  do t1 <- checkExpr e1 tdbs ctx
+     t2 <- checkExpr e2 tdbs ctx
      t <- newtyvar
      unify "app" t1 (FunType t2 (TyVar t))
-     (_, u) <- get
-     subsReturn (S.insert t (S.union ut1 ut2), TyVar t)
-checkExpr (Var name) (TD.Bindings tdbs cdbs) bs =
+     subsReturn (TyVar t)
+checkExpr (Var name) (TD.Bindings tdbs cdbs) (Context _ bs) =
   case M.lookup name bs of
     Just (qtvs, t) -> instQTypes qtvs t
     Nothing ->
@@ -95,7 +112,7 @@ checkExpr (Var name) (TD.Bindings tdbs cdbs) bs =
 checkExpr Fix _ _ =
   do tname <- newtyvar
      let t = TyVar tname
-     subsReturn (S.singleton tname, FunType (FunType t t) t)
+     subsReturn (FunType (FunType t t) t)
 checkExpr (Case name) (TD.Bindings tdbs cdbs) _ =
   caseType name tdbs cdbs
 
@@ -103,26 +120,25 @@ checkExpr (Case name) (TD.Bindings tdbs cdbs) _ =
 
 
 consType :: String -> Maybe ([String], [String]) -> [Type]
-         -> Context (UnInstTyVars, Type)
+         -> Env Type
 consType tcname Nothing _ = failure ("Constructor " ++ tcname ++ " has no matching type constructor")
 consType tcname (Just (tyvars, _)) ts =
   instQTypes (S.fromList tyvars) (funForm ts (TyCons tcname (map TyVar tyvars)))
 
-caseType :: String -> TD.TypeDefMap -> TD.ConsDefMap -> Context (UnInstTyVars, Type)
+caseType :: String -> TD.TypeDefMap -> TD.ConsDefMap -> Env Type
 caseType name tdbs cdbs =
   case M.lookup name tdbs of
     Nothing -> failure ("Case; type constructor " ++ name ++ " not defined")
     Just (tyvars, cdefs) ->
-      do (uitvs, m) <- getReplTyVars tyvars
+      do m <- getReplTyVars tyvars
          retTypeS <- newtyvar
          let retType = TyVar retTypeS
          fts <- mapM (caseConsType retType cdbs) cdefs
          let ct = funForm fts (FunType (TyCons name (TyVar <$> tyvars)) retType)
-         return (S.insert retTypeS uitvs,
-                 replaceTyVars m ct)
+         return (replaceTyVars m ct)
 
 caseConsType :: Type -> TD.ConsDefMap -> String
-             -> Context Type
+             -> Env Type
 caseConsType retType cdbs name =
   case M.lookup name cdbs of
     Nothing -> failure ("Case; data constructor " ++ name ++ " not defined")
@@ -133,17 +149,17 @@ funForm [] retType = retType
 funForm (t:ts) retType = FunType t (funForm ts retType)
 
 
-instQTypes :: UnInstTyVars -> Type -> Context (UnInstTyVars, Type)
-instQTypes uitvs t =
-  do (uitvs', m) <- getReplTyVars (S.toList uitvs)
-     return (uitvs', replaceTyVars m t)
+instQTypes :: S.Set String -> Type -> Env Type
+instQTypes ftvs t =
+  do m <- getReplTyVars (S.toList ftvs)
+     return (replaceTyVars m t)
 
-getReplTyVars :: [String] -> Context (UnInstTyVars, M.Map String String)
-getReplTyVars [] = return (S.empty, M.empty)
+getReplTyVars :: [String] -> Env (M.Map String String)
+getReplTyVars [] = return M.empty
 getReplTyVars (t:ts) =
   do t' <- newtyvar
-     (uitvs, m) <- getReplTyVars ts
-     return (S.insert t' uitvs, M.insert t t' m)
+     m <- getReplTyVars ts
+     return (M.insert t t' m)
 
 replaceTyVars :: M.Map String String -> Type -> Type
 replaceTyVars m (FunType t1 t2) =

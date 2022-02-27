@@ -50,7 +50,7 @@ checkTypeDef :: Bindings -> TypeDef -> Result ()
 checkTypeDef bs (TypeDef name targs cdefs) =
   do checkTArgs S.empty targs
      mapM_ (checkCDef bs (S.fromList targs)) cdefs
-     
+
 checkTArgs :: S.Set String -> [String] -> Result ()
 checkTArgs _ [] = return ()
 checkTArgs seen (t:ts) =

@@ -38,7 +38,7 @@ statementFromAST :: AST.Statement -> Statement
 statementFromAST (AST.TypeDefS tdef) = TypeDefS (tdefFromAST tdef)
 statementFromAST (AST.FuncDefS fdef) = FuncDefS (fdefFromAST fdef)
 
-  
+
 tdefFromAST :: AST.TypeDef -> TypeDef
 tdefFromAST (AST.TypeDef name args cdefs) =
   TypeDef name args (map cdefFromAST cdefs)
@@ -65,7 +65,7 @@ fdefFromAST (AST.FuncDef True name vars expr) =
 exprFromAST :: AST.Expr -> Expr
 exprFromAST (AST.Let [] e) = exprFromAST e
 exprFromAST (AST.Let (f:fs) e)
-  = Let (fdefFromAST f) (exprFromAST $ AST.Let fs e) 
+  = Let (fdefFromAST f) (exprFromAST $ AST.Let fs e)
 exprFromAST (AST.Lambda vs e) = lambdify vs e
 exprFromAST (AST.App e1 e2) = App (exprFromAST e1) (exprFromAST e2)
 exprFromAST (AST.Var name) = Var name
@@ -107,7 +107,7 @@ ppTArgs :: String -> [Type] -> String
 ppTArgs sep [] = ""
 ppTArgs sep [t] = ppTAParen t
 ppTArgs sep (t:ts) = ppTAParen t ++ sep ++ ppTArgs sep ts
-  
+
 ppTAParen :: Type -> String
 ppTAParen e@(FunType _ _) = "(" ++ ppType e ++ ")"
 ppTAParen e@(TyCons _ (_:_)) = "(" ++ ppType e ++ ")"

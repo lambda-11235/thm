@@ -1,6 +1,6 @@
 
 type False []
-type True [ T() ]
+type True [ T ]
 
 type Not 'a [ not('a -> False) ]
 

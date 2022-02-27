@@ -27,31 +27,31 @@ loadFile fname =
 loadFiles :: [String] -> IO [Statement]
 loadFiles fnames = fmap concat (mapM loadFile fnames)
 
-processFiles :: Bool -> [String] -> IO (TD.Bindings, TC.Bindings, E.Bindings)
+processFiles :: Bool -> [String] -> IO (TD.Bindings, TC.Context, E.Bindings)
 processFiles pprint fnames =
   do states <- loadFiles fnames
-     procFilesSub states TD.empty M.empty M.empty
+     procFilesSub states TD.empty TC.empty M.empty
   where
-    procFilesSub :: [Statement] -> TD.Bindings -> TC.Bindings
-                 -> E.Bindings -> IO (TD.Bindings, TC.Bindings, E.Bindings)
-    procFilesSub [] tdbs tbs dbs = return (tdbs, tbs, dbs)
-    procFilesSub ((TypeDefS tdef):states) tdbs tbs dbs =
+    procFilesSub :: [Statement] -> TD.Bindings -> TC.Context
+                 -> E.Bindings -> IO (TD.Bindings, TC.Context, E.Bindings)
+    procFilesSub [] tdbs tctx dbs = return (tdbs, tctx, dbs)
+    procFilesSub ((TypeDefS tdef):states) tdbs tctx dbs =
       case TD.updateBindings tdef tdbs of
         Left err -> fail ("Type Definition Error: " ++ err)
-        Right tdbs' -> procFilesSub states tdbs' tbs dbs
-    procFilesSub ((FuncDefS (FuncDef name e)):state) tdbs tbs dbs =
-      do (uitvs, t) <- checkExpr e tdbs tbs
+        Right tdbs' -> procFilesSub states tdbs' tctx dbs
+    procFilesSub ((FuncDefS (FuncDef name e)):state) tdbs tctx dbs =
+      do t <- checkExpr e tdbs tctx
          x <- evalExpr pprint e tdbs dbs
          when pprint (do putStrLn (name ++ " : " ++ ppType t)
                          putStrLn (name ++ " = " ++ E.ppData x)
                          when (not $ null state) (putStrLn ""))
-         let tbs' = TC.insert name uitvs t tbs
+         let tctx' = TC.insertLet name t tctx
          let dbs' = M.insert name x dbs
-         procFilesSub state tdbs tbs' dbs'
+         procFilesSub state tdbs tctx' dbs'
 
 
-repl :: (TD.Bindings, TC.Bindings, E.Bindings) -> IO ()
-repl bindings@(tdbs, tbs, dbs) =
+repl :: (TD.Bindings, TC.Context, E.Bindings) -> IO ()
+repl bindings@(tdbs, tctx, dbs) =
   do putStr "λ> "
      hFlush stdout
 
@@ -63,18 +63,18 @@ repl bindings@(tdbs, tbs, dbs) =
             Left err -> putStrLn (show err) >> repl bindings
             Right ast ->
               do let e = exprFromAST ast
-                 case TC.runContext (TC.checkExpr e tdbs tbs) of
+                 case TC.runEnv (TC.checkExpr e tdbs tctx) of
                    Left err -> putStrLn ("Type Error: " ++ err)
-                   Right (_, t) ->
+                   Right t ->
                      case (E.evalExpr tdbs dbs e) >>= (E.force tdbs) of
                        Left err -> putStrLn ("Evaluation Error: " ++ err)
                        Right x -> putStrLn (E.ppData x ++ " : " ++ ppType t)
                  repl bindings
 
 
-checkExpr :: Expr -> TD.Bindings -> TC.Bindings -> IO (TC.UnInstTyVars, Type)
-checkExpr e tdbs tbs =
-  case TC.runContext (TC.checkExpr e tdbs tbs) of
+checkExpr :: Expr -> TD.Bindings -> TC.Context -> IO Type
+checkExpr e tdbs tctx =
+  case TC.runEnv (TC.checkExpr e tdbs tctx) of
     Left err -> fail ("Type Error: " ++ err)
     Right x -> return x
 
