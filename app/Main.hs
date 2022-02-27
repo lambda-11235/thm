@@ -7,5 +7,5 @@ import Lib
 main :: IO ()
 main =
   do args <- getArgs
-     bindings <- processFiles True args
+     bindings <- processFiles False args
      repl bindings

@@ -40,12 +40,6 @@ sym = tokenPrim (show . getToken) pos (match' . getToken)
     match' (LSym name) = Just name
     match' _ = Nothing
 
-num :: Parser Int
-num = tokenPrim (show . getToken) pos (match' . getToken)
-  where
-    match' (LNum x) = Just x
-    match' _ = Nothing
-
 pos :: (SourcePos -> LexOut -> [LexOut] -> SourcePos)
 pos oldPos (LexOut _ line col _) _ = newPos (sourceName oldPos) line col
 
@@ -56,8 +50,55 @@ pos oldPos (LexOut _ line col _) _ = newPos (sourceName oldPos) line col
 topREPL :: Parser Expr
 topREPL = expr <* eof
 
-pfile :: Parser [FuncDef]
-pfile = many funcdef <* eof
+pfile :: Parser [Statement]
+pfile = many statement <* eof
+
+
+statement :: Parser Statement
+statement = (TypeDefS <$> typeDef) <|> (FuncDefS <$> funcdef)
+
+
+typeDef :: Parser TypeDef
+typeDef =
+  do match LType
+     tname <- sym
+     tvars <- many (match LTick *> sym)
+     match LLBracket
+     cdefs <- many consDef
+     match LRBracket
+     return (TypeDef tname tvars cdefs)
+
+consDef :: Parser ConsDef
+consDef =
+  do cname <- sym
+     match LLParen
+     targs <- sepBy ptype (match LComma)
+     match LRParen
+     return (ConsDef cname targs)
+
+
+ptype :: Parser Type
+ptype = try funType <|> ptype1
+
+funType =
+  do t1 <- ptype1
+     match LRightArrow
+     t2 <- ptype
+     return (FunType t1 t2)
+
+ptype1 = try tycons <|> ptype2
+
+tycons =
+  do name <- sym
+     args <- many ptype2
+     return (TyCons name args)
+
+ptype2 = tvar <|> tparen <|> tycons1
+tvar = match LTick *> (TyVar <$> sym)
+tparen = match LLParen *> ptype <* match LRParen
+tycons1 =
+  do name <- sym
+     return (TyCons name [])
 
 
 funcdef :: Parser FuncDef
@@ -101,11 +142,14 @@ atom :: Parser Expr
 atom = (match LLParen *> expr <* match LRParen) <|> (fmap Var sym) <|> keyword
 
 keyword :: Parser Expr
-keyword = (    (match LFix *> return Fix)
-           <|> (match LUnit *> return Unit)
-           <|> (fmap Num num)
-           <|> (match LSucc *> return S)
-           <|> (match LNatCase *> return NatCase))
+keyword = (match LFix *> return Fix) <|> pcase
+
+pcase :: Parser Expr
+pcase = do match LCase
+           match LLBracket
+           cons <- sym
+           match LRBracket
+           return (Case cons)
 
 arg :: Parser (Maybe String)
 arg = (fmap Just sym) <|> (match LUnderscore *> return Nothing)

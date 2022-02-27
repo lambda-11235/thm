@@ -5,7 +5,6 @@ module Lexer (Token (..), LexOut (..), scan) where
 %wrapper "posn"
 
 @str = [a-zA-Z][a-zA-Z0-9]*
-@num = [0-9]+
 
 tokens :-
 
@@ -14,40 +13,45 @@ tokens :-
 
   "("                                   { \p s -> lexOut p LLParen }
   ")"                                   { \p s -> lexOut p LRParen }
+  "["                                   { \p s -> lexOut p LLBracket }
+  "]"                                   { \p s -> lexOut p LRBracket }
 
+  ","                                   { \p s -> lexOut p LComma }
   "."                                   { \p s -> lexOut p LDot }
   "="                                   { \p s -> lexOut p LEqual }
   "\"                                   { \p s -> lexOut p LLambda }
+  "->"                                  { \p s -> lexOut p LRightArrow }
   ";"                                   { \p s -> lexOut p LSemiColon }
-
-  "let"                                 { \p s -> lexOut p LLet }
-  "in"                                  { \p s -> lexOut p LIn }
-  "fix"                                 { \p s -> lexOut p LFix }
-  "unit"                                { \p s -> lexOut p LUnit }
-  "S"                                   { \p s -> lexOut p LSucc }
-  "natCase"                             { \p s -> lexOut p LNatCase }
-
+  "'"                                   { \p s -> lexOut p LTick }
   "_"                                   { \p s -> lexOut p LUnderscore }
 
+  "case"                                { \p s -> lexOut p LCase }
+  "fix"                                 { \p s -> lexOut p LFix }
+  "in"                                  { \p s -> lexOut p LIn }
+  "let"                                 { \p s -> lexOut p LLet }
+  "type"                                { \p s -> lexOut p LType }
+
   @str                                  { \p s -> lexOut p (LSym s) }
-  @num                                  { \p s -> lexOut p (LNum $ read s) }
 
 {
 data Token = LLParen
            | LRParen
+           | LLBracket
+           | LRBracket
+           | LComma
            | LDot
            | LEqual
            | LLambda
+           | LRightArrow
            | LSemiColon
+           | LTick
            | LUnderscore
-           | LLet
-           | LIn
+           | LCase
            | LFix
-           | LUnit
-           | LSucc
-           | LNatCase
+           | LIn
+           | LLet
+           | LType
            | LSym String
-           | LNum Int
            deriving (Eq, Show)
 
 data LexOut = LexOut { offset :: Int

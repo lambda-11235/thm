@@ -1,4 +1,20 @@
 
+type Bottom []
+type Top [ top() ]
+
+type UnInhabited 'a [ un('a -> Bottom) ]
+
+type Prod 'a 'b [ prod('a, 'b) ]
+type Sum 'a 'b [ sum1('a) sum2('b) ]
+
+
+type Bool [ true() false() ]
+
+not b = case[Bool] false true b;
+and b1 b2 = case[Bool] b2 false b1;
+or b1 b2 = case[Bool] true b2 b1;
+
+
 id x = x;
 const x y = x;
 comp f g x = f (g x);
