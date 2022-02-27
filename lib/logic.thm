@@ -1,0 +1,18 @@
+
+type False []
+type True [ T() ]
+
+type Not 'a [ not('a -> False) ]
+
+type And 'a 'b [ and('a, 'b) ]
+type Or 'a 'b [ or1('a) or2('b) ]
+
+
+extNot = case[Not] (\x. x);
+
+
+# deMorgan1 : And (Not 'a) (Not 'b) -> Not (Or 'a 'b)
+deMorgan1 xay = not (\xoy. case[And] (\nx ny. case[Or] (extNot nx) (extNot ny) xoy) xay);
+
+# deMorgan2 : Or (Not 'a) (Not 'b) -> Not (And 'a 'b)
+deMorgan2 xoy = not (\xay. case[And] (\x y. case[Or] (\nx. extNot nx x) (\ny. extNot ny y) xoy) xay);

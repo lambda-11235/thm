@@ -34,11 +34,11 @@ fix pow m n = case[Nat] n1 (\p. mult m (pow m p)) n;
 
 fix sub m n = case[Nat] m (\p. sub (pred m) p) n;
 
-#fix div m n = lt m n (\_. 0) (\_. S (div (sub m n) n));
-#
-#fix rem m n = lt m n (\_. m) (\_. rem (sub m n) n);
-#
-#
-#fix fact n = natCase n (\_. S 0) (\p. mult n (fact p));
+fix div m n = case[Bool] Z (S (div (sub m n) n)) (lt m n);
 
-#fix repeatedly n f x = natCase n (\_. x) (\p. f (repeatedly p f x));
+fix rem m n = case[Bool] m (rem (sub m n) n) (lt m n);
+
+
+fix fact n = case[Nat] n1 (\p. mult n (fact p)) n;
+
+fix repeatedly n f x = case[Nat] x (\p. f (repeatedly p f x)) n;

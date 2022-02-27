@@ -28,6 +28,9 @@ force :: TD.Bindings -> Data -> Result Data
 force tdbs (DCons name xs) =
   do xs' <- mapM (force tdbs) xs
      return (DCons name xs')
+force tdbs f@(DFix (Just x)) =
+  do f' <- apply tdbs x f
+     force tdbs f'
 force tdbs (DThunk ctx e) =
   do d <- evalExpr tdbs ctx e
      force tdbs d
@@ -58,8 +61,8 @@ evalExpr _ _ Fix = return (DFix Nothing)
 
 apply :: TD.Bindings -> Data -> Data -> Result Data
 apply tdbs (DFix Nothing) d = return (DFix $ Just d)
-apply tdbs f@(DFix (Just df)) d =
-  do f' <- apply tdbs df f
+apply tdbs f@(DFix (Just _)) d =
+  do f' <- force tdbs f
      apply tdbs f' d
 apply tdbs (DFunction ctx name body) x =
   case name of
@@ -82,6 +85,7 @@ apply tdbs@(TD.Bindings tdbs' _) (DCase name args) x =
                case elemIndex cname cons of
                  Nothing -> Left ("Constructor " ++ cname ++ " does not belong to type " ++ name)
                  Just idx -> applyMany tdbs (args !! idx) xs
+             _ -> Left ("Bad case application " ++ ppData x')
 --apply f x = Left ("Failed to apply " ++ ppData f ++ " to " ++ ppData x)
 
 

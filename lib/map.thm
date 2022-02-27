@@ -1,3 +1,0 @@
-
-mapSingle x _ = x;
-mapAdd k v map idx = equal k idx (\_. v) (\_. map idx);
