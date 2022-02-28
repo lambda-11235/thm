@@ -79,13 +79,16 @@ apply tdbs@(TD.Bindings tdbs' _) (DCase name args) x =
       if length args < length cons then
         return (DCase name (args ++ [x]))
       else
-        do x' <- force tdbs x
-           case x' of
-             (DCons cname xs) ->
-               case elemIndex cname cons of
-                 Nothing -> Left ("Constructor " ++ cname ++ " does not belong to type " ++ name)
-                 Just idx -> applyMany tdbs (args !! idx) xs
-             _ -> Left ("Bad case application " ++ ppData x')
+        let (c, args') = case args of
+                        [] -> (x, [])
+                        (c:as) -> (c, as ++ [x])
+        in do c' <- force tdbs c
+              case c' of
+                (DCons cname xs) ->
+                  case elemIndex cname cons of
+                    Nothing -> Left ("Constructor " ++ cname ++ " does not belong to type " ++ name)
+                    Just idx -> applyMany tdbs (args' !! idx) xs
+                _ -> Left ("Bad case application " ++ ppData c')
 --apply f x = Left ("Failed to apply " ++ ppData f ++ " to " ++ ppData x)
 
 

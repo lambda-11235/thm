@@ -1,26 +1,24 @@
 
 type List 'a [ nil cons('a, List 'a) ]
 
-fix append x xs = case[List] (cons x nil)
-                             (\y ys. cons y (append x ys))
-                             xs;
+fix append x xs = case[List] xs
+                             (cons x nil)
+                             (\y ys. cons y (append x ys));
 
-fix concat xs ys = case[List] ys
-                              (\x xs. cons x (concat xs ys))
-                              xs;
+fix concat xs ys = case[List] xs
+                              ys
+                              (\x xs. cons x (concat xs ys));
 
-fix reverse xs = case[List] nil
-                            (\x xs. append x (reverse xs))
-                            xs;
+fix reverse xs = case[List] xs
+                            nil
+                            (\x xs. append x (reverse xs));
 
 fix zip f xs ys =
-  case[List]
+  case[List] xs
     nil
-    (\x xs. case[List]
+    (\x xs. case[List] ys
               nil
-              (\y ys. cons (f x y) (zip f xs ys))
-              ys)
-    xs;
+              (\y ys. cons (f x y) (zip f xs ys)));
 
 
 testList1 = cons false (cons true (cons true (cons false nil)));

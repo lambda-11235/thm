@@ -1,7 +1,7 @@
 
 type Nat [ Z S(Nat) ]
 
-fix natInd x f = case[Nat] x (\p. f (natInd x f p));
+fix natInd x f n = case[Nat] n x (\p. f (natInd x f p));
 
 n0 = Z;
 n1 = S n0;
@@ -15,32 +15,32 @@ n8 = S n7;
 n9 = S n8;
 n10 = S n9;
 
-pred = case[Nat] Z (\p. p);
+pred n = case[Nat] n Z (\p. p);
 
 fix equal m n =
-  case[Nat] (case[Nat] true (\_. false) n)
-            (\pm. case[Nat] false (\pn. equal pm pn) n)
-            m;
+  case[Nat] m
+            (case[Nat] n true (\_. false))
+            (\pm. case[Nat] n false (\pn. equal pm pn));
 
 fix lt m n =
-  case[Nat] (case[Nat] false (\_. true) n)
-            (\pm. case[Nat] false (\pn. lt pm pn) n)
-            m;
+  case[Nat] m
+            (case[Nat] n false (\_. true))
+            (\pm. case[Nat] n false (\pn. lt pm pn));
 
 
-fix add m n = case[Nat] n (\p. S (add p n)) m;
+fix add m n = case[Nat] m n (\p. S (add p n));
 
-fix mult m n = case[Nat] Z (\p. add n (mult p n)) m;
+fix mult m n = case[Nat] m Z (\p. add n (mult p n));
 
-fix pow m n = case[Nat] n1 (\p. mult m (pow m p)) n;
+fix pow m n = case[Nat] n n1 (\p. mult m (pow m p));
 
-fix sub m n = case[Nat] m (\p. sub (pred m) p) n;
+fix sub m n = case[Nat] n m (\p. sub (pred m) p);
 
-fix div m n = case[Bool] Z (S (div (sub m n) n)) (lt m n);
+fix div m n = if (lt m n) Z (S (div (sub m n) n));
 
-fix rem m n = case[Bool] m (rem (sub m n) n) (lt m n);
+fix rem m n = if (lt m n) m (rem (sub m n) n);
 
 
-fix fact n = case[Nat] n1 (\p. mult n (fact p)) n;
+fix fact n = case[Nat] n n1 (\p. mult n (fact p));
 
-fix repeatedly n f x = case[Nat] x (\p. f (repeatedly p f x)) n;
+fix repeatedly n f x = case[Nat] n x (\p. f (repeatedly p f x));

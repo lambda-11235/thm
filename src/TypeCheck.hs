@@ -134,7 +134,7 @@ caseType name tdbs cdbs =
          retTypeS <- newtyvar
          let retType = TyVar retTypeS
          fts <- mapM (caseConsType retType cdbs) cdefs
-         let ct = funForm fts (FunType (TyCons name (TyVar <$> tyvars)) retType)
+         let ct = FunType (TyCons name (TyVar <$> tyvars)) (funForm fts retType)
          return (replaceTyVars m ct)
 
 caseConsType :: Type -> TD.ConsDefMap -> String

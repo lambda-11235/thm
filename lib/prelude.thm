@@ -10,7 +10,7 @@ type Sum 'a 'b [ sum1('a) sum2('b) ]
 
 type Bool [ true false ]
 
-if b t f = case[Bool] t f b;
+if b t f = case[Bool] b t f;
 not b = if b false true;
 and b1 b2 = if b1 b2 false;
 or b1 b2 = if b1 true b2;

@@ -2,13 +2,13 @@
 type State 's 'a [ state('s -> Prod 's 'a) ]
 
 
-run st s = case[State] (\f. f s) st;
+run st s = case[State] st (\f. f s);
 
 return x = state (\s. prod s x);
 
 seq st f =
   state (\s1. let p = run st s1; in
-               case[Prod] (\s2 x. run (f x) s2) p);
+               case[Prod] p (\s2 x. run (f x) s2));
 
 seqIgn st1 st2 = seq st1 (\_. st2);
 
