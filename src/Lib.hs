@@ -11,7 +11,7 @@ import System.IO
 
 import Lexer
 import Parser
-import CST
+import AST
 import qualified TypeCheck as TC
 import qualified TypeDef as TD
 import qualified Eval as E
@@ -22,7 +22,7 @@ loadFile fname =
      let toks = scan contents
      case parse pfile fname toks of
        Left err -> fail (show err)
-       Right ast -> return (map statementFromAST ast)
+       Right ast -> return (map statementFromCST ast)
 
 loadFiles :: [String] -> IO [Statement]
 loadFiles fnames = fmap concat (mapM loadFile fnames)
@@ -62,7 +62,7 @@ repl bindings@(tdbs, tctx, dbs) =
           case parse topREPL "REPL" toks of
             Left err -> putStrLn (show err) >> repl bindings
             Right ast ->
-              do let e = exprFromAST ast
+              do let e = exprFromCST ast
                  case TC.runEnv (TC.checkExpr e tdbs tctx) of
                    Left err -> putStrLn ("Type Error: " ++ err)
                    Right t ->

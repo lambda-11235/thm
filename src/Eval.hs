@@ -9,7 +9,7 @@ module Eval ( Bindings (..)
 import Data.List (elemIndex)
 import qualified Data.Map as M
 
-import CST
+import AST
 import qualified TypeDef as TD
 
 

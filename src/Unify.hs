@@ -8,7 +8,7 @@ module Unify (Unification,
              )
 where
 
-import CST
+import AST
 
 
 type Unification = [(Type, Type)]

@@ -10,7 +10,7 @@ import Data.Foldable (foldr')
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import CST
+import AST
 
 
 -- TypeDefMap is a map from Type constructors to their TyVars and

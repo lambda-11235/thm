@@ -12,7 +12,7 @@ import qualified Data.Set as S
 
 import Debug.Trace (traceM)
 
-import CST
+import AST
 import Unify
 import qualified TypeDef as TD
 

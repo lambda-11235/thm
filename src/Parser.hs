@@ -17,7 +17,7 @@
 
 module Parser where
 
-import AST
+import CST
 import Lexer
 
 import Text.Parsec.Combinator
