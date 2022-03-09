@@ -1,0 +1,5 @@
+
+digraph IMPL2 {
+        rankdir=LR;
+        Lexer -> Parser -> TypeDef -> TypeCheck -> Eval;
+}

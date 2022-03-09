@@ -1,0 +1,9 @@
+
+digraph IMPL {
+        Lexer -> Parser;
+
+        Unify -> TypeCheck;
+        TypeDef -> {Eval,TypeCheck};
+
+        {Lexer,Parser,TypeCheck,TypeDef,Eval} -> Main;
+}

@@ -29,13 +29,12 @@
 %\usepackage{siunitx}
 %\usepackage{tcolorbox}
 %\usepackage{tikz}
-%\usepackage{todonotes}
+\usepackage{todonotes}
 %\usepackage{pgfmath}
 \usepackage{biblatex}
 
 \addbibresource{refs.bib}
 
-\geometry{hmargin=2cm,vmargin=4cm}
 %\setmainfont{DejaVu Sans}    %This is part of the fontspec package.
 %\doublespacing
 
@@ -66,6 +65,8 @@
 \newcommand{\Z}{\mathbb{Z}}
 \newcommand{\R}{\mathbb{R}}
 
+\newcommand{\lf}{\backslash}
+
 \newcommand{\beq}{::=}
 \newcommand{\bs}[1]{\mathrm{#1}}
 \newcommand{\bstr}[1]{\mathrm{"#1"}}
@@ -83,7 +84,7 @@
 \newtheorem{lemma}{Lemma}
 
 
-\title{A Hindley-Milner Typed Language}
+\title{THM: A Hindley-Milner Typed Language}
 \author{Taran Lynn}
 
 \begin{document}
@@ -92,71 +93,34 @@
 
 \section{Introduction}
 
-For my project I plan to implement a language that is Hindley-Milner
-typed.
-An example program is given in section \ref{sec:example}.
-I will design an interpreter than will read files and load function
-definitions from them.
-Interaction will then be done through a REPL, where the user can query
-the types of and evaluate expressions.
-The language will also be eagerly evaluated (call-by-value).
-To make the language Turing complete it will include the unit type,
-natural numbers, and a fixed point operator.
-The natural numbers will be encoded as Peano numbers, with a successor
-function $S$.
-Additionally, a special function natCase will allow for case analysis
-on the numbers, which in addition to the fixed point operator will
-allow all arithmetic operations to be performed.
-Because the language is eagerly evaluated, the fixed point operator
-will be defined as
-$$\mathrm{fix} f x = f~(\mathrm{fix}~f)~x$$
-(this avoids the problem of all recursive expressions becoming
-bottom).
+In this paper I will cover the design and implementation of the THM
+programming language.
+THM is a minimalist Hindley-Milner typed\todo{cite}
+programming language with algebraic data types\todo{cite}.
+The goal of designing THM was to create a language and implementation
+that was simple enough that it could be used as a teaching tool for
+courses on type inference.
+To this end the it has a small specification (see the appendix) and a
+small implementation (less than 1,000 lines of Haskell).
 
-Note that this work is an extension of my previous work on programming
-languages, which include work on the calculus of constructions and
-unification\cite{ttyped,tplpl}.
-This language I propose implementing is essentially an ML stripped
-down to its most basic components as a Hindley-Milner typed language.
-As such my main references are the Standard ML
-specification\cite{Milner1997TheDO} as well as Martelli and
-Montanari's work on unification\cite{Martelli1982AnEU}.
+THM is loosely base on the ML family of languages, specifically
+Standard ML.
+Besides dropping support for modules, other major changes were made to
+the syntax and semantics to reduce the size of the specification and
+implementation.
+For example, unlike most MLs, THM is lazily evaluated.
+This is relatively trivial to implement, and avoids the need to
+implement other control structures.
+Another major change is that there is no \verb~case~ construct.
+Instead there is a \verb~case~ \textbf{function}, which acts as the
+elimination rule for a type.
 
-While I am familiar with implementing types systems, my main learning
-objective for this project are to learn how to implement type
-inference, as my previous projects simply used types given by the
-programmer.
-Not only will this serve to help my learn about type inference, it
-could potentially also help other student learn as well.
-I believe the simple language and (hopefully) small implementation
-will be more approachable to someone who wants to delve into the
-actual workings behind type inference.
-
-The planned tasks for implementing the language are as follows.
-\begin{enumerate}
-\item Implement parser [COMPLETE].
-
-\item Implement type unifier [IN PROGRESS].
-
-\item Implement type inference algorithm.
-
-\item Implement execution engine.
-\end{enumerate}
-I expect the unification algorithm to be the most challenging to
-implement, with the inference algorithm being a bit easier.
-The execution engine should be straight forward to implement.
-In addition to the actual interpreter, I will also submit a report
-detailing the implementation and formal semantics of the language.
-The development of this report will be concurrent with that of the
-interpreter.
-Currently preliminary work on defining the syntax and semantics of the
-language are given in appendices \ref{app:syntax} and
-\ref{app:semantics}, and will be included in the report.
-
-
-\section{Example of Language Syntax}
-\label{sec:example}
-
+The THM interpreter is implemented in Haskell.
+To use it the user simply gives it a list of files with type and
+function definitions to type check and load, and the interpreter drops
+the user into a read/eval/print loop (REPL) that process THM
+expressions.
+An example of one definition file is
 \begin{verbatim}
 type Nat [ Z S(Nat) ]
 fix natInd x f = case[Nat] x (\p. f (natInd x f p));
@@ -165,6 +129,79 @@ pred = case[Nat] Z (\p. p);
 fix add m n = case[Nat] n (\p. S (add p n)) m;
 fix mult m n = case[Nat] Z (\p. add n (mult p n)) m;
 \end{verbatim}
+, and a corresponding REPL session is
+\begin{verbatim}
+\> Z
+Z : Nat
+\> S
+S : Nat -> Nat
+\> mult (S (S Z)) (S (S (S Z)))
+S (S (S (S (S (S Z))))) : Nat
+\>
+\end{verbatim}
+
+The following sections of the paper will give an intutionistic
+description of the background, design, and implementation of THM\todo{Give a brief description of sections}.
+For a more formal description, please see the appendix.
+
+
+\section{Background and Related Work}
+
+\todo[inline]{Describe Hindley and Milners work}
+
+\todo[inline]{Describe the theory behind unification}
+
+\todo[inline]{Describe the theory behind ADTs}
+
+\todo[inline]{Describe the creation of ML and SML}
+
+\todo[inline]{Describe current academic work and relation to
+  Haskell/Rust/etc.}
+
+
+\section{Design and Implementation}
+
+\subsection{Base Language}
+
+At the heart of THM is the lambda calculus.
+expression (denoted by $e$) are formed from variables $v$,
+lambda expressions $\lf v. e$, and application $e_1~e_2$.
+Note that $\lf$ is used because of its resemblance to $\lambda$.
+Lambda expressions group right, while applications group left.
+For example, $\lf f. \lf g. \lf x. f~g~x$ is equivalent to
+$\lf f. (\lf g. (\lf x. ((f~g)~x)))$.
+THM performs lazy evaluation, meaning that in an application
+$e_1~e_2$, $e_1$ is first evaluated to a lambda expression
+$\lf v. e_3$, and then $e_2$ is substituted into $e_3$ for $v$.
+The usual shadowing rules also apply (section \ref{sec:dynamic_sem}
+gives a more formal description).
+
+On top of the base lambda calculus we add let bindings.
+Syntactically these are given as
+$\mathrm{let} v = e_1; \mathrm{in} e_2$.
+In terms of evaluation semantics this construct is equivalent to
+$(\lf v. e_1)~e_2$.
+In the next section the type checking of let expressions will be
+addressed, in which they have no equivalent to lambda expressions.
+Finally, a fixed-point operator is added to the language to allow for
+type checkable recursion.
+The fixed-point operator is defined as
+$\mathrm{fix}~f = f~(\mathrm{fix}~f)$.
+Combined with lazy evaluation, this allows for the definition of
+recursive functions.
+Additionally, some syntactic sugar is also added to the base language
+(see section \ref{sec:concrete_syntax}).
+
+
+\subsection{Type Inference}
+
+
+\subsection{Algebraic Data Types}
+
+\subsection{Implementation Details}
+
+
+\section{Conclusion}
 
 
 \printbibliography
@@ -172,6 +209,8 @@ fix mult m n = case[Nat] Z (\p. add n (mult p n)) m;
 
 \pagebreak
 
+
+\appendix
 
 \section{Syntax}
 \label{app:syntax}
@@ -209,6 +248,7 @@ type constructor, and $\alpha$ is a quantified type variable.
 
 
 \subsection{EBNF Concrete Syntax}
+\label{sec:concrete_syntax}
 
 Comments begin with \#.
 Symbols as any non-keyword strings that match the regex\\
@@ -353,6 +393,7 @@ $\Gamma$, $e$ has type $t$.
 
 
 \subsection{Dynamic}
+\label{sec:dynamic_sem}
 
 Let $\sigma$ be the context of variable bindings and their
 environments.
