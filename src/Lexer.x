@@ -19,7 +19,10 @@ tokens :-
   ","                                   { \p s -> lexOut p LComma }
   "."                                   { \p s -> lexOut p LDot }
   "="                                   { \p s -> lexOut p LEqual }
+
   "\"                                   { \p s -> lexOut p LLambda }
+  "λ"                                   { \p s -> lexOut p LLambda }
+  
   "->"                                  { \p s -> lexOut p LRightArrow }
   ";"                                   { \p s -> lexOut p LSemiColon }
   "'"                                   { \p s -> lexOut p LTick }
