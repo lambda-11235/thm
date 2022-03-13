@@ -49,7 +49,7 @@
 %}
 
 % For multipage align*
-\allowdisplaybreaks
+%\allowdisplaybreaks
 
 
 \newcommand{\keyword}[1]{\textbf{#1}\index{#1}}
@@ -65,8 +65,6 @@
 \newcommand{\Z}{\mathbb{Z}}
 \newcommand{\R}{\mathbb{R}}
 
-\newcommand{\lf}{\backslash}
-
 \newcommand{\beq}{::=}
 \newcommand{\bs}[1]{\mathrm{#1}}
 \newcommand{\bstr}[1]{\mathrm{"#1"}}
@@ -79,6 +77,9 @@
 
 \newcommand{\env}[1]{\langle #1 \rangle}
 
+\newcommand{\thmlet}[2]{\mathrm{let}~#1~\mathrm{in}~#2}
+\newcommand{\thmfix}{\mathrm{fix}}
+\newcommand{\thmcase}[1]{\mathrm{case}\sbr{#1}}
 
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}{Lemma}
@@ -141,67 +142,330 @@ S (S (S (S (S (S Z))))) : Nat
 \end{verbatim}
 
 The following sections of the paper will give an intutionistic
-description of the background, design, and implementation of THM\todo{Give a brief description of sections}.
+description of the background theory, design, and implementation of
+THM.
 For a more formal description, please see the appendix.
 
 
 \section{Background and Related Work}
 
-\todo[inline]{Describe Hindley and Milners work}
 
-\todo[inline]{Describe the theory behind unification}
+Lambda calculus was originally developed by Alonzo Church as a
+foundational formulation of mathematics and computation.
+However, because the lambda calculus allowed for non-reducible
+terms, it was shown to be inconsistent.
+To get around this Church introduced types to the lambda calculus,
+creating the simply typed lambda calculus\cite{Church1940AFO}.
+When lambda calculus began to be as a bases programming languages,
+computer scientists also started adopting its type
+theories\footnote{By this time there where many such type theories.}.
 
-\todo[inline]{Describe the theory behind ADTs}
+A mathematician by the name of J. Roger Hindley later worked on a
+method for deducing types of SKI combinator
+expressions\cite{Hindley1969}.
+About a decade later Robin Milner worked on ML, the metalanguage for
+the LCF proof system, based on typed lambda calculus.
+As part of ML there was an algorithm to infer the types of terms to
+reduce programmer overhead.
+This algorithm W for inferring types was later presented in
+\cite{MILNER1978}, which they later noted corresponded to Hindley's
+work.
+Luis Damas then refined the corresponding type system as part of his
+PhD thesis\cite{Damas1982,Damas1984}.
+The resulting type system is called the Hindley-Milner-Damas or
+Hindley-Milner typing.
 
-\todo[inline]{Describe the creation of ML and SML}
+It should be noted that Hindley-Milner type inference relies on a
+unification algorithm to work.
+Unification is a process that take multiple equations relating
+constructed objects that contain variables, and determining what
+values for the variables could make the equations valid.
+My work uses the unification algorithm presented by Martelli and
+Montanari\cite{Martelli1982}.
+This unification algorithm was chosen because it is fairly
+straightforward to implement and is decently efficient.
 
-\todo[inline]{Describe current academic work and relation to
-  Haskell/Rust/etc.}
+Several languages later built off of the work of ML.
+A notable example is Standard ML (SML)\cite{Milner1997TheDO}, which is
+notable among programming languages for having its specification fully
+mathematically formalized.
+More mainstream languages based off of ML include
+Haskell\cite{Marlow2010Haskell2L} and Rust.
+One important component of the languages is algebraic data types
+(ADTs).
+ADTs form a convenient way to describe data, and are important in
+Hindley-Milner typed languages because the restrictions necessary for
+decidable inference limits the usability of Church encodings.
 
 
-\section{Design and Implementation}
+\section{Design}
 
 \subsection{Base Language}
 
 At the heart of THM is the lambda calculus.
-expression (denoted by $e$) are formed from variables $v$,
-lambda expressions $\lf v. e$, and application $e_1~e_2$.
-Note that $\lf$ is used because of its resemblance to $\lambda$.
-Lambda expressions group right, while applications group left.
-For example, $\lf f. \lf g. \lf x. f~g~x$ is equivalent to
-$\lf f. (\lf g. (\lf x. ((f~g)~x)))$.
-THM performs lazy evaluation, meaning that in an application
-$e_1~e_2$, $e_1$ is first evaluated to a lambda expression
-$\lf v. e_3$, and then $e_2$ is substituted into $e_3$ for $v$.
-The usual shadowing rules also apply (section \ref{sec:dynamic_sem}
-gives a more formal description).
+Expressions, denoted by $e$, are formed by several different
+constructs.
+\begin{description}
+\item[Variables] Denoted by $v$, refer to the parameters of
+  encapsulating lambda expressions.
 
-On top of the base lambda calculus we add let bindings.
-Syntactically these are given as
-$\mathrm{let} v = e_1; \mathrm{in} e_2$.
-In terms of evaluation semantics this construct is equivalent to
-$(\lf v. e_1)~e_2$.
-In the next section the type checking of let expressions will be
-addressed, in which they have no equivalent to lambda expressions.
-Finally, a fixed-point operator is added to the language to allow for
-type checkable recursion.
-The fixed-point operator is defined as
-$\mathrm{fix}~f = f~(\mathrm{fix}~f)$.
-Combined with lazy evaluation, this allows for the definition of
-recursive functions.
-Additionally, some syntactic sugar is also added to the base language
-(see section \ref{sec:concrete_syntax}).
+\item[Lambda Abstractions] Denoted by $\lambda v. e$, are anonymous
+  functions that take $v$ as a parameter and return $e$.
+  Lambda abstractions group to the right, so $\lambda u. \lambda v. e$
+  is equivalent to $\lambda u. (\lambda v. e)$.
+  Note that the user may use $\backslash$ instead of $\lambda$ for
+  ease of use on ASCII keyboards.
+
+\item[Applications] Denoted by $e_1~e_2$, apply the term $e_2$ to
+  $e_1$.
+  Since THM is lazy evaluated, we evaluating applications by first
+  evaluating $e_1$.
+  If $e_1$ evaluates to $\lambda v. e_3$, then we evaluate $e_3$ with
+  $v$ bond to the thunk formed from $e_2$ (see appendix
+  \ref{sec:dynamic_sem} for a formal description).
+  Additionally application rules also exist, which will be detailed
+  in later parts of the text.
+
+\item[Let Bindings] Denoted by $(\thmlet{v = e_1;}{e_2})$ binds the
+  thunk formed from $e_1$ to $v$ and evaluates $e_2$.
+
+\item[Fix-point Operator] Denoted by $\thmfix$, has a special
+  application rule such that $\thmfix~f$ evaluates to $f~(\thmfix~f)$.
+  This allows for recursion in functions.
+\end{description}
+Beyond these basic forms some syntactic sugar is also added to the
+base language (see appendix \ref{sec:concrete_syntax}).
 
 
 \subsection{Type Inference}
 
+Given any expression, THM will decide if the expression is typeable,
+and if so will infer the most general type for the expression.
+Types, denoted by $t$, in the base THM have several constructions.
+\begin{description}
+\item[Type Variables] Denoted by $`\tau$, type variables represent
+  unspecified types.
+
+\item[Function Types] Denoted by $t_1 \to t_2$, represent functions
+  that take arguments of type $t_1$ and return values of type $t_2$.
+  Like lambda abstractions these group to the right, so
+  $t_1 \to t_2 \to t_3$ is equivalent to $t_1 \to (t_2 \to t_3)$.
+
+\item[Quantified Types] Denoted by $\forall `\alpha. t$, these denote
+  types where the type variable $`\alpha$ can change.
+  If one likens type variables to expression variables, then
+  quantified types can be likened to lambda abstractions.
+  One thing to note is that only let binded variables may have
+  quantified types, and not any other expression or value.
+  This restriction is necessary for type inference to be decidable.
+\end{description}
+
+Before I describe how to infer what the most general type of
+an expression, let me briefly describe type unification.
+Suppose we have a set of equations between types (i.e.
+$t_1 = t_2, t_3 = t_4, \ldots$), the goal of type unification is to
+determine what types can be substituted for the equations type
+variables to make the equations valid.
+For example, suppose we have the equations
+\begin{align*}
+  `\tau_1 \to `\tau_2 &= `\tau_1 \to (`\tau_1 \to `\tau_3)\\
+  `\tau_3 &= `\tau_4 \to `\tau_1\\
+  `\tau_4 &= `\tau_4
+\end{align*}
+Applying the unification algorithm would give
+\begin{align*}
+  `\tau_2 &= `\tau_1 \to `\tau_4 \to `\tau_1\\
+  `\tau_3 &= `\tau_4 \to `\tau_1
+\end{align*}
+A couple things to note are that
+\begin{enumerate}
+\item Obvious equalities (i.e. $x = x$) are removed.
+  
+\item All type variables are fully expanded on right hand side of the
+  equations.
+  This is why $`\tau_2 = `\tau_1 \to `\tau_4 \to `\tau_1$ and not
+  $`\tau_2 = `\tau_1 \to `\tau_3$
+\end{enumerate}
+For a more detailed explanation of the unification algorithm, please
+refer to \cite{Martelli1982AnEU}.
+
+Now I will describe the type inference algorithm.
+I will be omitting some details for the sake of clarity, see appendix
+\ref{sec:static_semantics} for the complete formalization.
+At all stages of type inference we have a context $\Gamma$, which is
+simply the mapping of variables to the types of the values they are
+bound to.
+There are several cases
+\begin{itemize}
+\item If we have a variable $v$ then we take $t = \Gamma(v)$.
+  If $t$ is a quantified type, then we apply it to free type
+  variables.
+
+\item If we have a lambda abstraction $\lambda v. e$, then we first
+  declare a new unique type variable $`\tau$;
+  infer the type $t$ of $e$ while setting $\Gamma(v) = `\tau$; and
+  deduce the abstraction type as $`\tau \to t$.
+
+\item If we have an application $e_1~e_2$ we first infer $e_1 : t_1$
+  and $e_2 : t_2$; then let $`\tau$ be a new unique type variable;
+  unify $t_1$ with $t_2 \to `\tau$; and deduce that $e_1~e_2$ has the
+  type of whatever $`\tau$ unifies as.
+
+\item If we have a let binding $(\thmlet{v := e_1;}{e_2})$, then we
+  deduce the type of $e_1$ and quantify over it to get the type $t_1$;
+  and infer the type $t_2$ of $e_2$ while setting $\Gamma(v) = t_1$;
+  with the inference giving $(\thmlet{v := e_1;}{e_2}) : t_2$.
+  Note that quantifying over a type $t$ means we take all the free
+  type variable $`\tau_1,\ldots,`\tau_n$ in $t$, and return the type
+  $\forall `\tau_1. \ldots \forall `\tau_n. t$.
+  That is, we convert it into a quantified type.
+
+\item For the fix-point operator we simply let $`\tau$ be a new type
+  variable, and infer that $\thmfix : (`\tau \to `\tau) \to `\tau$.
+\end{itemize}
+That was a fairly brief description of the Hindley-Milner type
+inference algorithm.
+For more details or clarifications please see the appendix and
+Milner and Damas'
+work\cite{MILNER1978,Damas1982,Damas1984}\footnote{Milner's work comes
+from a mathematical perspective, and would be less useful in to learn
+from in this context}.
+
 
 \subsection{Algebraic Data Types}
 
-\subsection{Implementation Details}
+As note earlier quantified types can not be passed through function
+application.
+These means that complex functions that use Church encodings may fail.
+For example, the common definition of the predecessor function for
+natural numbers is
+\begin{align*}
+Z~x~f &= x;\\
+S~n~x~f &= f~(n~x~f);\\
+pair~x~y~f &= f~x~y;\\
+pred~n &= (n~(pair~Z~Z)~(\lambda p.~p~(\lambda x~y.~pair~y~(S~x))))~(\lambda x~\_.~x);
+\end{align*}
+However, running $pred~(S~(S~Z))$ will give a complex type error due
+to the fact that we swap the pair $x$ and $y$ on each update, giving
+a circular type.
+
+To improve usability the base language is thus extended with algebraic
+data types (ADTs).
+These allow us to easily construct new types.
+The syntax for ADTs is
+\begin{align*}
+  &\mathrm{type}~T~`\tau_1~\ldots~`\tau_m~[\\
+  &\qquad C_1(t_{11}, \ldots, t_{1n_1})\\
+  &\qquad \vdots\\
+  &\qquad C_k(t_{k1}, \ldots, t_{kn_k})\\
+  &]
+\end{align*}
+Where $T$ is the type name, $`\tau_1, \ldots, `\tau_m$ are its type
+parameters, and $C_1,\ldots,C_k$ are its constructors.
+Each constructor $C_i$ forms a new function, with
+$$C_i : \forall `\tau_1~\ldots~`\tau_m.~t_{i1} \to \cdots \to t_{in_i} \to T~`\tau_1~\ldots~`\tau_m$$.
+A new built-in case matching function $\thmcase{T}$ is also formed,
+with type
+\begin{align*}
+  \thmcase{T} : \forall `\tau_1~\ldots~`\tau_m~`\rho.
+  &\quad T~`\tau_1~\ldots~`\tau_m \to (t_{11} \to \cdots \to t_{1n_1} \to `\rho)\\
+  &\qquad \to \cdots \to (t_{k1} \to \cdots \to t_{kn_k} \to `\rho) \to `\rho
+\end{align*}.
+If we consider a value $z = C_i~x_1~\ldots~x_{n_i}$, then case matching
+evaluates $(\thmcase{T}~z~f_1~\ldots~f_k)$ to $f_i~x_1~\ldots~x_{n_i}$.
+Essentially we give a function for each constructor of $T$, and then
+apply it the correct function to the arguments of the constructor.
+
+For example, lists can be defined as
+\begin{align*}
+  &\mathrm{type}~\mathrm{List}~`a~[\\
+  &\qquad \mathrm{nil}\\
+  &\qquad \mathrm{cons}(`a, \mathrm{List}~`a)\\
+  &]
+\end{align*}
+Here we have
+\begin{align*}
+  \mathrm{nil} &: \forall `a.~\mathrm{List}~`a\\
+  \mathrm{cons} &: \forall `a.~`a \to \mathrm{List}~`a \to \mathrm{List}~`a
+\end{align*}
+If $x : t$, then using these constructors we could get
+$(\mathrm{cons}~x~\mathrm{nil}) : \mathrm{List}~t$.
+We also have
+$$\thmcase{\mathrm{List}} : \forall `a `\rho.~
+\mathrm{List}~a \to `\rho \to (`a \to \mathrm{List}~`a \to `\rho) \to `\rho$$,
+which for example evaluates for each constructor as
+\begin{align*}
+  \thmcase{\mathrm{List}}~\mathrm{nil}~x~f &\Rightarrow x\\
+  \thmcase{\mathrm{List}}~(\mathrm{cons}~y~l)~x~f &\Rightarrow f~y~l
+\end{align*}
+
+One interesting thing to note about THM's ADT is that they are
+flexible enough to also allow for bottom types to be defined.
+A bottom type is defined as
+$$\mathrm{type}~\mathrm{Bottom}~[~]$$.
+The important thing to note is that there is no way to construct a
+value with type bottom (aside from infinite recursion).
+This can make it useful for abstractions where the user wants to state
+that we should never get a value in some location.
+This simply demonstrates the flexibility of THM's ADTs.
+
+
+\section{Implementation and Use}
+
+THM is implemented as an interpreter written in Haskell using the
+Stack build tool\cite{stack}.
+Basic usage is to give the interpreter a set of file with function and
+type definitions to load, after which it will print the types of
+loaded functions, and then start the REPL to evaluate expressions.
+An example session is
+\begin{verbatim}
+sh > rlwrap stack run lib/prelude.thm
+if : Bool -> 'g -> 'g -> 'g
+if = <function>
+
+not : Bool -> Bool
+not = <function>
+
+and : Bool -> Bool -> Bool
+and = <function>
+
+or : Bool -> Bool -> Bool
+or = <function>
+
+...
+
+\> and true false
+false : Bool
+\> or true false
+true : Bool
+\> case[Bottom]
+case[Bottom] : Bottom -> 'a
+\end{verbatim}
+Note that THM provides a set of library files, with lib/prelude.thm
+containing basic definitions.
+Other library files providing natural number, lists, and stateful
+semantics are also provided.
+The source code can be found at
+\url{https://github.com/lambda-11235/thm}.
 
 
 \section{Conclusion}
+
+THM is a Hindley-Milner typed programming language designed for
+educational use.
+It's formal specification is small enough to be described in 5 pages
+(see the appendix), and its source code is composed of 10 files and
+less than 800 lines of code.
+In fact, the type checking and evaluation components (the main
+components of interest in teaching) are less than 400 lines of code.
+Compared to implementations of SML or Haskell, this makes THM a viable
+project to study for graduate students trying to learn how to
+implement type inference, ADTs, and lazy evaluation.
+If you, the reader, are a professor or teacher who is or will be
+teaching type theory, consider using this project for instructional
+use.
+Pull requests to improve the code's approachability are also
+welcome\footnote{\url{https://github.com/lambda-11235/thm/pulls}}.
 
 
 \printbibliography
@@ -218,11 +482,11 @@ Additionally, some syntactic sugar is also added to the base language
 \subsection{Abstract Syntax}
 
 $x$ indicates a variable, $e$ is an expression, $C$ is a data
-constructor, $\tau$ indicates a type variable, $t$ is a type, $T$ is a
-type constructor, and $\alpha$ is a quantified type variable.
+constructor, $`\tau$ indicates a type variable, $t$ is a type, $T$ is a
+type constructor, and $`\alpha$ is a quantified type variable.
 
 \begin{align}
-  \mathrm{TypeDef} &:= \mathrm{type}~T~\tau_1~\cdots~\tau_m \sbr{
+  \mathrm{TypeDef} &:= \mathrm{type}~T~`\tau_1~\cdots~`\tau_m \sbr{
                      C_1\del{t_{11},\ldots,t_{1n_1}} 
                      \cdots
                      C_k\del{t_{k1},\ldots,t_{kn_k}}
@@ -230,7 +494,7 @@ type constructor, and $\alpha$ is a quantified type variable.
 \end{align}
 
 \begin{align}
-  t &:= t_1 \to t_2 ~|~ T~t_1 \ldots t_n ~|~ \tau ~|~ \forall \alpha. t
+  t &:= t_1 \to t_2 ~|~ T~t_1 \ldots t_n ~|~ `\tau ~|~ \forall `\alpha. t
 \end{align}
 
 \begin{align}
@@ -239,9 +503,9 @@ type constructor, and $\alpha$ is a quantified type variable.
   \mathrm{Cons} &:= C\\
   \mathrm{Lambda} &:= \lambda x. e ~|~ \lambda \_. e\\
   \mathrm{App} &:= e_1~e_2\\
-  \mathrm{Let} &:= \mathrm{let}~x = e_1;~\mathrm{in}~e_2\\
-  \mathrm{Fix} &:= \mathrm{fix}\\
-  \mathrm{Case} &:= \mathrm{case}\sbr{T}
+  \mathrm{Let} &:= \thmlet{x = e_1;}{e_2}\\
+  \mathrm{Fix} &:= \thmfix\\
+  \mathrm{Case} &:= \thmcase{T}
 \end{align}
 
 
@@ -271,7 +535,7 @@ A number is \verb~[0-9]+~.
 \begin{align}
   \bs{funcdef} &\beq \sbr{\bstr{fix}}, \bs{symbol}, \cbr{\bs{symbol}}, \bstr{=}, \bs{expr}, \bstr{;} ;\\
   \bs{expr} &\beq \bstr{let}, \bs{funcdef}, \cbr{\bs{funcdef}}, \bstr{in}, \bs{expr} ;\\
-              &\qquad|~ \bstr{\backslash}, \bs{arg}, \cbr{\bs{arg}}, \bstr{.}, \bs{expr} ;\\
+              &\qquad|~ (\bstr{\backslash} | \bstr{\lambda}), \bs{arg}, \cbr{\bs{arg}}, \bstr{.}, \bs{expr} ;\\
                  &\qquad|~ \bs{app}\\
   \bs{app} &\beq \bs{atom} ~|~ \bs{app}, \bs{atom} ;\\
   \bs{atom} &\beq \bstr{(}, \bs{expr}, \bstr{)} ~|~ \bs{symbol} ~|~ \bs{case} ;\\
@@ -285,12 +549,12 @@ The rules to convert from the main language to the abstract one are
 \begin{align}
   \lambda x_1 x_2 \cdots. e
   &\Rightarrow \lambda x_1. \lambda x_2. \lambda \cdots. e\\
-  \mathrm{let}~x_1 := e_1;~x_2 := e_2;~\ldots~\mathrm{in}~e
-  &\Rightarrow \mathrm{let}~x_1 := e_1;~\mathrm{in}~\mathrm{let}~x_2 := e_2;~\mathrm{in}~\ldots~\mathrm{in}~e\\
-  \mathrm{let}~f~x_1~x_2~\cdots := e_1;~\mathrm{in}~e_2
-  &\Rightarrow \mathrm{let}~f := \lambda x_1 x_2 \cdots. e_1;~\mathrm{in}~e_2\\
-  \mathrm{let}~\mathrm{fix}~f~x_1~x_2~\cdots := e_1;~\mathrm{in}~e_2
-  &\Rightarrow \mathrm{let}~f := \mathrm{fix}~\del{\lambda f x_1 x_2 \cdots. e_1};~\mathrm{in}~e_2
+  \thmlet{x_1 := e_1;~x_2 := e_2;~\ldots}{e}
+  &\Rightarrow \thmlet{x_1 := e_1;}{\thmlet{x_2 := e_2;}{\ldots~\mathrm{in}~e}}\\
+  \thmlet{f~x_1~x_2~\cdots := e_1;}{e_2}
+  &\Rightarrow \thmlet{f := \lambda x_1 x_2 \cdots. e_1;}{e_2}\\
+  \thmlet{\thmfix~f~x_1~x_2~\cdots := e_1;}{e_2}
+  &\Rightarrow \thmlet{f := \thmfix~\del{\lambda f x_1 x_2 \cdots. e_1};}{e_2}
 \end{align}
 
 
@@ -306,12 +570,12 @@ Suppose we have a type definition following the pattern given in
 There are three semantic rules that need to be verified.
 \begin{enumerate}
 \item For any pair of type variables
-  $a, b \in \cbr{\tau_1,\ldots,\tau_m}$ that $T$ parameterizes over
+  $a, b \in \cbr{`\tau_1,\ldots,`\tau_m}$ that $T$ parameterizes over
   $a \neq b$.
 
 \item For any type $t$ used in one of the constructors
   $C_1,\ldots,C_k$ we require
-  $\freevars{t} \subseteq \cbr{\tau_1,\ldots,\tau_m}$.
+  $\freevars{t} \subseteq \cbr{`\tau_1,\ldots,`\tau_m}$.
 
 \item For any type $t$ used in one of the constructors
   $C_1,\ldots,C_k$ we require that the only type constructors used are
@@ -333,19 +597,19 @@ $t_2$.
 It does by adding $t_1 = t_2$ to the set of unification equations and
 then simplifying.
 $\inst{\sigma}$ takes a possibly quantified type (i.e. of the form
-$\sigma = \forall \alpha_1, \ldots, \alpha_n. t$) and produces the
+$\sigma = \forall `\alpha_1, \ldots, `\alpha_n. t$) and produces the
 $t_u$ by replacing the
 quantified type variables with new unique ones, that is
 \begin{align*}
-  t_1,\ldots,t_n &= \newtyvar\\
-  t_u &= [t_1/\alpha_1, \ldots, t_n/\alpha_n] t
+  `\tau_1,\ldots,`\tau_n &= \newtyvar\\
+  t_u &= [`\tau_1/`\alpha_1, \ldots, `\tau_n/`\alpha_n] t
 \end{align*}
 $\gen{\Gamma}{t}$ does the opposite of $\inst{\sigma}$, that is it
 quantifies over all the free type variables in $t$ that not also free
 in $\Gamma$, or
 \begin{align*}
-  \cbr{\alpha_1, \ldots, \alpha_n} &= \freevars{t} - \freevars{\Gamma}\\
-  \gen{\Gamma}{t} &= \forall \alpha_1~\ldots~\alpha_n, t
+  \cbr{`\alpha_1, \ldots, `\alpha_n} &= \freevars{t} - \freevars{\Gamma}\\
+  \gen{\Gamma}{t} &= \forall `\alpha_1~\ldots~`\alpha_n, t
 \end{align*}
 The syntax $\Gamma \vdash e : t$ means that in the context
 $\Gamma$, $e$ has type $t$.
@@ -358,36 +622,36 @@ $\Gamma$, $e$ has type $t$.
   \end{equation}
 
 \item[Cons] Suppose $C(t_1,\ldots,t_n)$ is a constructor for some type
-  $T~\tau_1\cdots\tau_m$, then
+  $T~`\tau_1\cdots`\tau_m$, then
   \begin{equation}
-    \frac{}{\Gamma \vdash C : \forall \tau_1\cdots\tau_m, t_1 \to \cdots \to t_n \to T~\tau_1\cdots\tau_m}
+    \frac{}{\Gamma \vdash C : \forall `\tau_1 \cdots `\tau_m, t_1 \to \cdots \to t_n \to T~`\tau_1 \cdots `\tau_m}
   \end{equation}
 
 \item[Lambda]
   \begin{gather}
-    \frac{\tau = \newtyvar \qquad \Gamma, x : \tau \vdash e : t}{\Gamma \vdash \lambda x. e : \tau \to t}\\
-    \frac{\tau = \newtyvar \qquad \Gamma \vdash e : t}{\Gamma \vdash \lambda \_. e : \tau \to t}
+    \frac{`\tau = \newtyvar \qquad \Gamma, x : `\tau \vdash e : t}{\Gamma \vdash \lambda x. e : `\tau \to t}\\
+    \frac{`\tau = \newtyvar \qquad \Gamma \vdash e : t}{\Gamma \vdash \lambda \_. e : `\tau \to t}
   \end{gather}
 
 \item[App]
   \begin{equation}
-    \frac{\Gamma \vdash e_1 : t_1 \qquad \Gamma \vdash e_2 : t_2 \qquad \tau = \newtyvar \qquad \unify{t_1}{t_2 \to \tau}}{\Gamma \vdash e_1~e_2 : \tau}
+    \frac{\Gamma \vdash e_1 : t_1 \qquad \Gamma \vdash e_2 : t_2 \qquad `\tau = \newtyvar \qquad \unify{t_1}{t_2 \to `\tau}}{\Gamma \vdash e_1~e_2 : `\tau}
   \end{equation}
 
 \item[Let]
   \begin{equation}
-    \frac{\Gamma \vdash e_1 : t \qquad \Gamma, x : \gen{\Gamma}{t} \vdash e_2 : t'}{\Gamma \vdash \mathrm{let}~x = e_1;~\mathrm{in}~e_2 : t'}
+    \frac{\Gamma \vdash e_1 : t \qquad \Gamma, x : \gen{\Gamma}{t} \vdash e_2 : t`}{\Gamma \vdash \thmlet{x = e_1;}{e_2} : t`}
   \end{equation}
 
 \item[Fix]
   \begin{equation}
-    \frac{t_1, t_2 = \newtyvar}{\Gamma \vdash \mathrm{fix} : (t_1 \to t_2) \to (t_1 \to t_2)}
+    \frac{`\tau_1, `\tau_2 = \newtyvar}{\Gamma \vdash \thmfix : (`\tau_1 \to `\tau_2) \to (`\tau_1 \to `\tau_2)}
   \end{equation}
 
 \item[Case] Suppose we have a type definition following the pattern
   given in \eqref{eq:typedef}.
   \begin{equation}
-    \frac{\rho = \newtyvar}{\Gamma \vdash \mathrm{case}\sbr{T} : T~\tau_1\cdots\tau_m \to (t_{11} \to \cdots \to t_{1n_1} \to \rho) \to \cdots \to (t_{k1} \to \cdots \to t_{kn_k} \to \rho) \to \rho}
+    \frac{`\rho = \newtyvar}{\Gamma \vdash \thmcase{T} : T~`\tau_1~\cdots~`\tau_m \to (t_{11} \to \cdots \to t_{1n_1} \to `\rho) \to \cdots \to (t_{k1} \to \cdots \to t_{kn_k} \to `\rho) \to `\rho}
   \end{equation}
 \end{description}
 
@@ -406,6 +670,8 @@ $$\sigma'(y) =
   (e, s) &\text{if } y = x\\
   \sigma(y) &\text{if } y \neq x\\
 \end{cases}$$
+Note that $(e, s) : E \times \Sigma$ is the thunk formed from the
+expression $e$ in some environment $s$.
 
 \begin{description}
 \item[Var]
@@ -424,20 +690,20 @@ $$\sigma'(y) =
 
 \item[Let]
   \begin{gather}
-    \frac{\env{e_1, \sigma} \to \env{e_1', \sigma}}{\env{\mathrm{let}~x = e_1;~\mathrm{in}~e_2, \sigma} \to \env{\mathrm{let}~x = e_1';~\mathrm{in}~e_2, \sigma}}\\
-    \frac{}{\env{\mathrm{let}~x = e_1;~\mathrm{in}~e_2, \sigma} \to \env{e_2, [(e_1, \sigma)/x]\sigma}}
+    \frac{\env{e_1, \sigma} \to \env{e_1', \sigma}}{\env{\thmlet{x = e_1;}{e_2}, \sigma} \to \env{\thmlet{x = e_1';}{e_2}, \sigma}}\\
+    \frac{}{\env{\thmlet{x = e_1;}{e_2}, \sigma} \to \env{e_2, [(e_1, \sigma)/x]\sigma}}
   \end{gather}
 
 \item[Fix]
   \begin{equation}
-    \frac{}{\env{\mathrm{fix}~f, \sigma} \to \env{f~(\mathrm{fix}~f), \sigma}}
+    \frac{}{\env{\thmfix~f, \sigma} \to \env{f~(\thmfix~f), \sigma}}
   \end{equation}
 
-\item[natCase] Suppose we have a type definition following the pattern
+\item[Case] Suppose we have a type definition following the pattern
   given in \eqref{eq:typedef}.
   Let $C_i$ be the $i$th listed constructor, then
   \begin{gather}
-    \frac{}{\env{\mathrm{case}~(C_i~x_1~\cdots~x_n)~f_1~\cdots~f_k, \sigma} \to \env{f_i~x_1~\cdots~x_n, \sigma}}\\
+    \frac{}{\env{\thmcase{T}~(C_i~x_1~\cdots~x_n)~f_1~\cdots~f_k, \sigma} \to \env{f_i~x_1~\cdots~x_n, \sigma}}\\
   \end{gather}
 \end{description}
 
