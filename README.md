@@ -11,6 +11,6 @@ small implementation (less than 1,000 lines of Haskell).
 
 THM uses the Haskell [Stack build tool](https://docs.haskellstack.org/).
 To build it enter the following at the command line
-```sh > stack build```
+```stack build```
 , and to run the REPL enter the following at the command line
-```sh > stack run lib/prelude.thm```
+```stack run lib/prelude.thm```
